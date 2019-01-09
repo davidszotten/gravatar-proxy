@@ -1,0 +1,13 @@
+[package]
+name = "gravatar-proxy"
+version = "0.1.0"
+authors = ["David Szotten <davidszotten@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+actix = "0.7.9"
+actix-web = {version="0.7.17", features=["ssl"]}
+clap = "2.32.0"
+fernet = "0.1.0"
+futures = "0.1.25"
+md-5 = "0.8.0"
