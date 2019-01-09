@@ -10,17 +10,18 @@ use clap;
 use futures::{Future, Stream};
 use md5::{Digest, Md5};
 
-/// streaming client request to a streaming server response
 fn streaming((path, req): (Path<String>, HttpRequest<State>)) -> FutureResponse<HttpResponse> {
+    // fetch query params to pass on to gravatar
     let query = req.query_string();
-    let password = &req.state().password;
 
-    let fernet = fernet::Fernet::new(&password).unwrap();
+    let fernet = &req.state().fernet;
+
     let email = fernet.decrypt(&path.as_ref());
     let email = email.unwrap();
 
+    // gravatar hash of email address
     let hash = Md5::new().chain(email).result();
-    // send client request
+
     client::ClientRequest::get(format!(
         "https://www.gravatar.com/avatar/{:x}?{}",
         hash, query
@@ -32,6 +33,10 @@ fn streaming((path, req): (Path<String>, HttpRequest<State>)) -> FutureResponse<
     .and_then(|resp| {
         // <- we received client response
         let mut new_response = HttpResponse::Ok();
+
+        // copy over cache headers
+        // (some of the other headers include e.g. the email hash so we want
+        // to be selctive)
         for (key, value) in resp.headers().into_iter() {
             if key == http::header::CACHE_CONTROL
                 || key == http::header::DATE
@@ -49,7 +54,7 @@ fn streaming((path, req): (Path<String>, HttpRequest<State>)) -> FutureResponse<
 }
 
 struct State {
-    password: String,
+    fernet: fernet::Fernet,
 }
 
 fn main() {
@@ -59,18 +64,23 @@ fn main() {
         .about("Gravatar proxy")
         .version("0.1.0")
         .arg(
+            clap::Arg::with_name("password")
+                .help("Password for encrypting the email addresses")
+                .long("password")
+                .value_name("PASSWORD")
+                .required(true)
+                .index(1)
+                .validator(|v| match fernet::Fernet::new(&v) {
+                    Some(_) => Ok(()),
+                    None => Err(String::from("Invalid Fernet key")),
+                })
+        )
+        .arg(
             clap::Arg::with_name("bind")
                 .help("Bind to a specific address (ip:port)")
                 .long("bind")
                 .value_name("ADDR")
                 .default_value("localhost:6000"),
-        )
-        .arg(
-            clap::Arg::with_name("password")
-                .help("Password for encrypting the email addresses")
-                .long("password")
-                .value_name("PASSWORD")
-                .default_value("password"),
         )
         .get_matches();
 
@@ -79,7 +89,7 @@ fn main() {
 
     server::new(move || {
         App::with_state(State {
-            password: password.clone(),
+            fernet: fernet::Fernet::new(&password).unwrap(),
         })
         .resource("/avatar/{path}", |r| {
             r.method(http::Method::GET).with(streaming)
