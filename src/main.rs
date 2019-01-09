@@ -16,8 +16,14 @@ fn streaming((path, req): (Path<String>, HttpRequest<State>)) -> FutureResponse<
 
     let fernet = &req.state().fernet;
 
-    let email = fernet.decrypt(&path.as_ref());
-    let email = email.unwrap();
+    let email = match fernet.decrypt(&path.as_ref()) {
+        Ok(value) => value,
+        Err(_) => {
+            return Box::new(futures::future::result::<HttpResponse, Error>(Ok(
+                HttpResponse::build(http::StatusCode::BAD_REQUEST).finish(),
+            )));
+        }
+    };
 
     // gravatar hash of email address
     let hash = Md5::new().chain(email).result();
@@ -73,7 +79,7 @@ fn main() {
                 .validator(|v| match fernet::Fernet::new(&v) {
                     Some(_) => Ok(()),
                     None => Err(String::from("Invalid Fernet key")),
-                })
+                }),
         )
         .arg(
             clap::Arg::with_name("bind")
@@ -84,11 +90,13 @@ fn main() {
         )
         .get_matches();
 
+    // clap makes sure these are set. ok to unwrap
     let bind = matches.value_of("bind").unwrap();
     let password = matches.value_of("password").unwrap().to_string();
 
     server::new(move || {
         App::with_state(State {
+            // clap validator checks this is ok. fine to unwrap
             fernet: fernet::Fernet::new(&password).unwrap(),
         })
         .resource("/avatar/{path}", |r| {
