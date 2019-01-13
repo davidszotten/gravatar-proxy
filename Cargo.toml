@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 actix = "0.7.9"
-actix-web = {version="0.7.17", features=["ssl"]}
+actix-web = {version="0.7.17", features=["tls"]}
 clap = "2.32.0"
 fernet = "0.1.0"
 futures = "0.1.25"
