@@ -16,20 +16,15 @@ fn streaming((path, req): (Path<String>, HttpRequest<State>)) -> FutureResponse<
 
     let fernet = &req.state().fernet;
 
-    let email = match fernet.decrypt(&path.as_ref()) {
-        Ok(value) => value,
-        Err(_) => {
-            return Box::new(futures::future::result::<HttpResponse, Error>(Ok(
-                HttpResponse::build(http::StatusCode::BAD_REQUEST).finish(),
-            )));
-        }
+    // gravatar hash of email address
+    let hash = match fernet.decrypt(&path.as_ref()) {
+        Ok(email) => format!("{:x}", Md5::new().chain(email).result()),
+        // gravatar shows a default for invalid hashes
+        Err(_) => "fallback".into(),
     };
 
-    // gravatar hash of email address
-    let hash = Md5::new().chain(email).result();
-
     client::ClientRequest::get(format!(
-        "https://www.gravatar.com/avatar/{:x}?{}",
+        "https://www.gravatar.com/avatar/{}?{}",
         hash, query
     ))
     .finish()
