@@ -21,6 +21,8 @@ ARGS:
     <KEY>    Password for encrypting the email addresses
 ```
 
+Serves images at `http://<ADDR>/avatar/<encrypted>`, where `encrypted` is the **email address** encrypted using the shared Fernet key. Any query params are passed along unchanged.
+
 ## License
 
 MIT
