@@ -70,10 +70,10 @@ fn main() {
         .about("Gravatar proxy")
         .version("0.1.0")
         .arg(
-            clap::Arg::with_name("password")
-                .help("Password for encrypting the email addresses")
-                .long("password")
-                .value_name("PASSWORD")
+            clap::Arg::with_name("key")
+                .help("Key for encrypting the email addresses")
+                .long("key")
+                .value_name("KEY")
                 .required(true)
                 .index(1)
                 .validator(|v| match fernet::Fernet::new(&v) {
@@ -92,12 +92,12 @@ fn main() {
 
     // clap makes sure these are set. ok to unwrap
     let bind = matches.value_of("bind").unwrap();
-    let password = matches.value_of("password").unwrap().to_string();
+    let key = matches.value_of("key").unwrap().to_string();
 
     server::new(move || {
         App::with_state(State {
             // clap validator checks this is ok. fine to unwrap
-            fernet: fernet::Fernet::new(&password).unwrap(),
+            fernet: fernet::Fernet::new(&key).unwrap(),
         })
         .resource("/avatar/{path}", |r| {
             r.method(http::Method::GET).with(streaming)
